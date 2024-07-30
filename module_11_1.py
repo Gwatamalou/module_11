@@ -2,12 +2,11 @@ import json
 import requests
 import pandas as pd
 import numpy as np
-import multiprocessing as mp
+from threading import Thread, Lock
 import matplotlib.pyplot as plt
 
+# ===================================================================
 
-#===================================================================
-#
 cityes = ['Tokyo', 'Delhi', 'Shanghai', 'São Paulo', 'Mumbai', 'Beijing', 'Cairo', 'Dhaka', 'Mexico City', 'Osaka',
           'New York City', 'Karachi', 'Chongqing', 'Istanbul', 'Kolkata', 'Manila', 'Rio de Janeiro', 'Guangzhou',
           'Lahore', 'Shenzhen', 'Bangalore', 'Moscow', 'Tianjin', 'Jakarta', 'London', 'Lima', 'Bangkok', 'Chengdu',
@@ -17,18 +16,15 @@ cityes = ['Tokyo', 'Delhi', 'Shanghai', 'São Paulo', 'Mumbai', 'Beijing', 'Cair
 
 q = {'q': None, 'appid': '67ad722f344bbab57f17ee1dbe5101c9', 'units': 'metric'}
 URL = f'http://api.openweathermap.org/data/2.5/weather'
-# tem = []
+tem = []
+lock = Lock()
 
 
-
-
-with mp.Manager as manager:
-    tem = manager.dict()
-    for city in cityes:
-        q['q'] = city
-        try:
-            response = requests.get(URL, q)
-            response.raise_for_status()
+def func(q, city):
+    try:
+        response = requests.get(URL, q)
+        response.raise_for_status()
+        with lock:
             data = response.json()
             city_weather = {
                 'City': city,
@@ -37,19 +33,22 @@ with mp.Manager as manager:
                 'Description': data['weather'][0]['description']
             }
             tem.append(city_weather)
-        except requests.exceptions.RequestException as e:
-            print(f"Ошибка: {e}")
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка: {e}")
+
+
+p_list = []
+for city in cityes:
+    q['q'] = city
+    p = Thread(target=func, args=(q, city,))
+    p.start()
+    p_list.append(p)
+
+for p in p_list:
+    p.join()
 
 df = pd.DataFrame(tem)
-print(pd)
 
-# with mp.Manager() as manager:
-#     requestDict = manager.dict()
-#     for request in requests:
-#         p = mp.Process(target=self.process_request, args=(request, requestDict, lock,))
-#         p.start()
-#         p.join()
-#     self.data.update(requestDict)
 # #===================================================================
 # x = []
 # df = pd.DataFrame()
